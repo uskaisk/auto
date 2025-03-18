@@ -1,0 +1,182 @@
+// ==UserScript==
+// @name         Cygnus Auto Clicker - Professional Edition
+// @namespace    https://github.com/uskaisk
+// @version      2.1
+// @description  High-performance auto-clicker for Cygnus with unlimited clicks and professional UI enhancements
+// @author       Mohsin
+// @match        https://i.cygnus.finance/*
+// @grant        none
+// @license      MIT
+// ==/UserScript==
+
+(function () {
+  'use strict';
+
+  // Configuration Constants
+  const CONFIG = {
+    DEFAULT_INTERVAL: 50,        // Base click interval in milliseconds
+    MAX_FAILURE_COUNT: 5,        // Consecutive failure threshold before reset
+    RESET_RECOVERY_DELAY: 1000,  // Reset recovery time in milliseconds
+    UI_ANIMATION_DURATION: 300   // Watermark fade-in duration in milliseconds
+  };
+
+  // Runtime State Management
+  let operationalState = {
+    clickInterval: CONFIG.DEFAULT_INTERVAL,
+    isActive: false,
+    failureCounter: 0,
+    timeoutReference: null
+  };
+
+  // UI Component Factory
+  const createWatermark = () => {
+    const watermarkContainer = document.createElement('div');
+    
+    // Watermark styling
+    Object.assign(watermarkContainer.style, {
+      position: 'fixed',
+      bottom: '20px',
+      right: '20px',
+      color: 'rgba(255, 255, 255, 0.9)',
+      backgroundColor: 'rgba(0, 0, 0, 0.7)',
+      padding: '8px 16px',
+      borderRadius: '4px',
+      fontSize: '14px',
+      fontFamily: "'Segoe UI', system-ui, sans-serif",
+      fontWeight: '500',
+      backdropFilter: 'blur(2px)',
+      zIndex: '10000',
+      opacity: '0',
+      transition: `opacity ${CONFIG.UI_ANIMATION_DURATION}ms ease-out`,
+      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)'
+    });
+
+    watermarkContainer.innerHTML = `
+      <span style="display: inline-flex; align-items: center; gap: 8px;">
+        <svg viewBox="0 0 24 24" width="14" height="14" style="fill: currentColor;">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+        </svg>
+        Script by Mohsin
+      </span>
+    `;
+
+    document.body.appendChild(watermarkContainer);
+    
+    // Animate watermark appearance
+    requestAnimationFrame(() => {
+      watermarkContainer.style.opacity = '1';
+    });
+
+    return watermarkContainer;
+  };
+
+  // Control Panel Implementation
+  const initializeControlPanel = () => {
+    const panel = document.createElement('div');
+    panel.id = 'cygnusControlPanel';
+    
+    // Panel styling
+    Object.assign(panel.style, {
+      position: 'fixed',
+      top: '50%',
+      left: '50%',
+      transform: 'translate(-50%, -50%)',
+      background: 'rgba(0, 0, 0, 0.95)',
+      color: '#ffffff',
+      padding: '24px',
+      borderRadius: '12px',
+      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+      zIndex: '10000',
+      width: '320px',
+      textAlign: 'center'
+    });
+
+    panel.innerHTML = `
+      <h3 style="margin: 0 0 16px; font-weight: 500;">Auto-Click Controller</h3>
+      <div style="margin-bottom: 20px;">
+        <output id="intervalDisplay" style="display: block; margin-bottom: 8px; font-size: 13px;">
+          ${operationalState.clickInterval}ms
+        </output>
+        <input type="range" 
+               id="intervalController" 
+               min="50" 
+               max="1000" 
+               value="${operationalState.clickInterval}" 
+               step="10" 
+               style="width: 100%; height: 6px;"
+               aria-label="Click interval adjustment">
+      </div>
+    `;
+
+    document.body.appendChild(panel);
+
+    // Input event binding
+    const intervalInput = document.getElementById('intervalController');
+    const intervalOutput = document.getElementById('intervalDisplay');
+    
+    intervalInput.addEventListener('input', (event) => {
+      operationalState.clickInterval = parseInt(event.target.value, 10);
+      intervalOutput.textContent = `${operationalState.clickInterval}ms`;
+    });
+  };
+
+  // Core Automation Engine
+  const executeClickCycle = () => {
+    if (!operationalState.isActive) return;
+
+    const targetElement = document.querySelector('div[class*="bg-[url(/images/play-bg.png)]"]');
+    
+    if (targetElement) {
+      targetElement.dispatchEvent(new PointerEvent('pointerdown', {
+        bubbles: true,
+        cancelable: true,
+        view: window
+      }));
+      operationalState.failureCounter = 0;
+    } else {
+      operationalState.failureCounter++;
+      console.warn('Target element not found - attempt:', operationalState.failureCounter);
+    }
+
+    if (operationalState.failureCounter >= CONFIG.MAX_FAILURE_COUNT) {
+      console.error('Failure threshold reached - initiating system reset');
+      performSystemReset();
+      return;
+    }
+
+    operationalState.timeoutReference = setTimeout(executeClickCycle, operationalState.clickInterval);
+  };
+
+  // System Control Functions
+  const activateSystem = () => {
+    if (!operationalState.isActive) {
+      operationalState.isActive = true;
+      operationalState.failureCounter = 0;
+      executeClickCycle();
+    }
+  };
+
+  const performSystemReset = () => {
+    clearTimeout(operationalState.timeoutReference);
+    operationalState.isActive = false;
+
+    setTimeout(() => {
+      console.log('System reset complete - resuming operations');
+      activateSystem();
+    }, CONFIG.RESET_RECOVERY_DELAY);
+  };
+
+  // Initialization Sequence
+  const initializeApplication = () => {
+    initializeControlPanel();
+    createWatermark();
+    activateSystem();
+  };
+
+  // Bootstrapping
+  if (document.readyState === 'complete') {
+    initializeApplication();
+  } else {
+    window.addEventListener('load', initializeApplication);
+  }
+})();
